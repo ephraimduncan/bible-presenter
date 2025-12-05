@@ -1,65 +1,806 @@
-import Image from "next/image";
+"use client"
 
-export default function Home() {
+import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ExternalLink, Moon, Sun, Book, BookOpen, Loader2, X, Plus, FileText, History } from "lucide-react"
+import { oldTestament, newTestament, formatBookForApi, type BibleBook } from "@/lib/bible-data"
+
+type FontSize = "small" | "medium" | "large" | "extra-large"
+
+interface SelectedVerse {
+  id: string
+  book: string
+  chapter: number
+  verse: number
+  text: string
+  reference: string
+}
+
+interface VerseData {
+  verses: SelectedVerse[]
+  fontSize: FontSize
+  darkMode: boolean
+}
+
+interface HistoryItem {
+  id: string
+  text: string
+  reference: string
+  timestamp: number
+}
+
+export default function ControlPanel() {
+  const [selectedBook, setSelectedBook] = useState<BibleBook | null>(null)
+  const [selectedChapter, setSelectedChapter] = useState<number | null>(null)
+  const [selectedVerse, setSelectedVerse] = useState<number | null>(null)
+  const [currentVerseText, setCurrentVerseText] = useState("")
+  const [currentReference, setCurrentReference] = useState("")
+  const [selectedVerses, setSelectedVerses] = useState<SelectedVerse[]>([])
+  const [fontSize, setFontSize] = useState<FontSize>("extra-large") // default to extra-large
+  const [darkMode, setDarkMode] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [slideshowWindow, setSlideshowWindow] = useState<Window | null>(null)
+  const [liveVerses, setLiveVerses] = useState<SelectedVerse[]>([])
+  const [previewVerses, setPreviewVerses] = useState<SelectedVerse[]>([])
+
+  const [customNoteTitle, setCustomNoteTitle] = useState("")
+  const [customNoteText, setCustomNoteText] = useState("")
+  const [activeTab, setActiveTab] = useState("bible")
+  const [history, setHistory] = useState<HistoryItem[]>([])
+
+  useEffect(() => {
+    const savedHistory = localStorage.getItem("biblePresenterHistory")
+    if (savedHistory) {
+      setHistory(JSON.parse(savedHistory))
+    }
+  }, [])
+
+  const addToHistory = (text: string, reference: string) => {
+    const newItem: HistoryItem = {
+      id: `history-${Date.now()}`,
+      text,
+      reference,
+      timestamp: Date.now(),
+    }
+    const updatedHistory = [newItem, ...history.filter((h) => h.text !== text || h.reference !== reference)].slice(
+      0,
+      50,
+    )
+    setHistory(updatedHistory)
+    localStorage.setItem("biblePresenterHistory", JSON.stringify(updatedHistory))
+  }
+
+  const projectFromHistory = (item: HistoryItem) => {
+    const verse: SelectedVerse = {
+      id: `history-${Date.now()}`,
+      book: "",
+      chapter: 0,
+      verse: 0,
+      text: item.text,
+      reference: item.reference,
+    }
+    const data: VerseData = {
+      verses: [verse],
+      fontSize,
+      darkMode,
+    }
+    localStorage.setItem("bibleVerseData", JSON.stringify(data))
+    window.dispatchEvent(new Event("storage"))
+    setLiveVerses([verse])
+  }
+
+  const clearHistory = () => {
+    setHistory([])
+    localStorage.removeItem("biblePresenterHistory")
+  }
+
+  useEffect(() => {
+    const updateFaviconAndTitle = () => {
+      const canvas = document.createElement("canvas")
+      canvas.width = 32
+      canvas.height = 32
+      const ctx = canvas.getContext("2d")
+      if (ctx) {
+        ctx.fillStyle = "#3b82f6"
+        ctx.fillRect(0, 0, 32, 32)
+        ctx.fillStyle = "#ffffff"
+        ctx.font = "bold 20px sans-serif"
+        ctx.textAlign = "center"
+        ctx.textBaseline = "middle"
+        ctx.fillText("C", 16, 17)
+
+        const link = document.querySelector("link[rel='icon']") as HTMLLinkElement
+        if (link) {
+          link.href = canvas.toDataURL()
+        } else {
+          const newLink = document.createElement("link")
+          newLink.rel = "icon"
+          newLink.href = canvas.toDataURL()
+          document.head.appendChild(newLink)
+        }
+      }
+
+      if (currentReference) {
+        document.title = `${currentReference} - Control Panel`
+      } else if (selectedBook) {
+        document.title = `${selectedBook.name} - Control Panel`
+      } else {
+        document.title = "Bible Presenter - Control Panel"
+      }
+    }
+
+    updateFaviconAndTitle()
+  }, [currentReference, selectedBook])
+
+  useEffect(() => {
+    if (selectedBook && selectedChapter && selectedVerse) {
+      fetchVerse(selectedBook.name, selectedChapter, selectedVerse)
+    }
+  }, [selectedBook, selectedChapter, selectedVerse])
+
+  const fetchVerse = async (book: string, chapter: number, verse: number) => {
+    setLoading(true)
+    try {
+      const bookForApi = formatBookForApi(book)
+      const response = await fetch(`https://bible-api.com/${bookForApi}+${chapter}:${verse}?translation=kjv`)
+      const data = await response.json()
+      if (data.text) {
+        setCurrentVerseText(data.text.trim())
+        setCurrentReference(`${book} ${chapter}:${verse}`)
+      } else {
+        setCurrentVerseText("Verse not found")
+        setCurrentReference(`${book} ${chapter}:${verse}`)
+      }
+    } catch (error) {
+      setCurrentVerseText("Error fetching verse. Please try again.")
+      setCurrentReference(`${book} ${chapter}:${verse}`)
+    }
+    setLoading(false)
+  }
+
+  const addVerseToSelection = () => {
+    if (!selectedBook || !selectedChapter || !selectedVerse || !currentVerseText) return
+
+    const id = `${selectedBook.name}-${selectedChapter}-${selectedVerse}`
+    if (selectedVerses.some((v) => v.id === id)) return
+
+    const newVerse: SelectedVerse = {
+      id,
+      book: selectedBook.name,
+      chapter: selectedChapter,
+      verse: selectedVerse,
+      text: currentVerseText,
+      reference: currentReference,
+    }
+    setSelectedVerses([...selectedVerses, newVerse])
+  }
+
+  const removeVerse = (id: string) => {
+    setSelectedVerses(selectedVerses.filter((v) => v.id !== id))
+  }
+
+  const clearAllVerses = () => {
+    setSelectedVerses([])
+  }
+
+  const openSlideshowWindow = () => {
+    const newWindow = window.open(
+      "/slideshow",
+      "BibleSlideshow",
+      "width=1920,height=1080,menubar=no,toolbar=no,location=no,status=no",
+    )
+    setSlideshowWindow(newWindow)
+    setTimeout(() => {
+      updateSlide()
+    }, 500)
+  }
+
+  const updateSlide = () => {
+    const versesToProject =
+      selectedVerses.length > 0
+        ? selectedVerses
+        : currentVerseText
+          ? [
+              {
+                id: "single",
+                book: selectedBook?.name || "",
+                chapter: selectedChapter || 0,
+                verse: selectedVerse || 0,
+                text: currentVerseText,
+                reference: currentReference,
+              },
+            ]
+          : []
+
+    const data: VerseData = {
+      verses: versesToProject,
+      fontSize,
+      darkMode,
+    }
+    localStorage.setItem("bibleVerseData", JSON.stringify(data))
+    window.dispatchEvent(new Event("storage"))
+
+    setLiveVerses(versesToProject)
+
+    if (selectedVerses.length > 0) {
+      selectedVerses.forEach((v) => addToHistory(v.text, v.reference))
+    } else if (currentVerseText) {
+      addToHistory(currentVerseText, currentReference)
+    }
+  }
+
+  const projectCustomNote = () => {
+    if (!customNoteText.trim()) return
+
+    const noteVerse: SelectedVerse = {
+      id: `note-${Date.now()}`,
+      book: "",
+      chapter: 0,
+      verse: 0,
+      text: customNoteText.trim(),
+      reference: customNoteTitle.trim() || "",
+    }
+
+    const noteData: VerseData = {
+      verses: [noteVerse],
+      fontSize,
+      darkMode,
+    }
+    localStorage.setItem("bibleVerseData", JSON.stringify(noteData))
+    window.dispatchEvent(new Event("storage"))
+
+    setLiveVerses([noteVerse])
+
+    addToHistory(customNoteText.trim(), customNoteTitle.trim() || "Note")
+  }
+
+  const addCustomNoteToQueue = () => {
+    if (!customNoteText.trim()) return
+
+    const newNote: SelectedVerse = {
+      id: `note-${Date.now()}`,
+      book: "",
+      chapter: 0,
+      verse: 0,
+      text: customNoteText.trim(),
+      reference: customNoteTitle.trim() || "Note",
+    }
+    setSelectedVerses([...selectedVerses, newNote])
+    setCustomNoteText("")
+    setCustomNoteTitle("")
+  }
+
+  const previewNote = () => {
+    if (!customNoteText.trim()) return
+    setCurrentVerseText(customNoteText.trim())
+    setCurrentReference(customNoteTitle.trim() || "")
+  }
+
+  const fontSizeOptions: { value: FontSize; label: string }[] = [
+    { value: "small", label: "S" },
+    { value: "medium", label: "M" },
+    { value: "large", label: "L" },
+    { value: "extra-large", label: "XL" },
+  ]
+
+  const handleBookSelect = (book: BibleBook) => {
+    setSelectedBook(book)
+    setSelectedChapter(null)
+    setSelectedVerse(null)
+    setCurrentVerseText("")
+    setCurrentReference("")
+  }
+
+  const handleChapterSelect = (chapter: number) => {
+    setSelectedChapter(chapter)
+    setSelectedVerse(null)
+    setCurrentVerseText("")
+    setCurrentReference("")
+  }
+
+  const handleVerseSelect = async (verse: number) => {
+    if (!selectedBook || !selectedChapter) return
+
+    setSelectedVerse(verse)
+    setLoading(true)
+
+    try {
+      const bookForApi = formatBookForApi(selectedBook.name)
+      const response = await fetch(`https://bible-api.com/${bookForApi}+${selectedChapter}:${verse}?translation=kjv`)
+      const data = await response.json()
+
+      if (data.text) {
+        const verseText = data.text.trim()
+        const reference = `${selectedBook.name} ${selectedChapter}:${verse}`
+
+        setCurrentVerseText(verseText)
+        setCurrentReference(reference)
+
+        const newVerse: SelectedVerse = {
+          id: `${selectedBook.name}-${selectedChapter}-${verse}`,
+          book: selectedBook.name,
+          chapter: selectedChapter,
+          verse: verse,
+          text: verseText,
+          reference: reference,
+        }
+        setPreviewVerses([newVerse])
+      }
+    } catch (error) {
+      setCurrentVerseText("Error fetching verse. Please try again.")
+    }
+    setLoading(false)
+  }
+
+  const handleVerseDoubleClick = async (verse: number) => {
+    if (!selectedBook || !selectedChapter) return
+
+    setSelectedVerse(verse)
+    setLoading(true)
+
+    try {
+      const bookForApi = formatBookForApi(selectedBook.name)
+      const response = await fetch(`https://bible-api.com/${bookForApi}+${selectedChapter}:${verse}?translation=kjv`)
+      const data = await response.json()
+
+      if (data.text) {
+        const verseText = data.text.trim()
+        const reference = `${selectedBook.name} ${selectedChapter}:${verse}`
+
+        setCurrentVerseText(verseText)
+        setCurrentReference(reference)
+
+        const newVerse: SelectedVerse = {
+          id: `${selectedBook.name}-${selectedChapter}-${verse}`,
+          book: selectedBook.name,
+          chapter: selectedChapter,
+          verse: verse,
+          text: verseText,
+          reference: reference,
+        }
+        setPreviewVerses([newVerse])
+        setLiveVerses([newVerse])
+
+        const verseData = {
+          verses: [newVerse],
+          fontSize,
+          darkMode,
+        }
+        localStorage.setItem("bibleVerseData", JSON.stringify(verseData))
+        window.dispatchEvent(new Event("storage"))
+
+        addToHistory(verseText, reference)
+      }
+    } catch (error) {
+      setCurrentVerseText("Error fetching verse. Please try again.")
+    }
+    setLoading(false)
+  }
+
+  const goLive = () => {
+    if (previewVerses.length > 0) {
+      setLiveVerses(previewVerses)
+      updateSlide()
+    } else if (currentVerseText) {
+      const newVerse: SelectedVerse = {
+        id: "single",
+        book: selectedBook?.name || "",
+        chapter: selectedChapter || 0,
+        verse: selectedVerse || 0,
+        text: currentVerseText,
+        reference: currentReference,
+      }
+      setLiveVerses([newVerse])
+      updateSlide()
+    }
+  }
+
+  const isCurrentVerseSelected =
+    selectedBook &&
+    selectedChapter &&
+    selectedVerse &&
+    selectedVerses.some((v) => v.id === `${selectedBook.name}-${selectedChapter}-${selectedVerse}`)
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="h-screen bg-background flex flex-col xl:flex-row overflow-hidden">
+      {/* Preview & Live Panels - Shows first on mobile */}
+      <div className="flex-1 min-h-0 flex flex-col xl:h-full overflow-hidden order-1 xl:order-2">
+        <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
+          <h2 className="font-semibold flex items-center gap-2">
+            <BookOpen className="h-4 w-4" />
+            Display
+          </h2>
+          <div className="flex items-center gap-2">
+            {/* Font Size */}
+            <div className="flex gap-1">
+              {fontSizeOptions.map((option) => (
+                <Button
+                  key={option.value}
+                  variant={fontSize === option.value ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setFontSize(option.value)}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+            {/* Theme Toggle */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 p-0 bg-transparent"
+              onClick={() => setDarkMode(!darkMode)}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              {darkMode ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+            </Button>
+          </div>
+        </div>
+
+        {/* Preview & Live Panels */}
+        <div className="flex-1 min-h-0 p-4 xl:p-6 flex flex-col gap-4 overflow-hidden justify-center items-center">
+          {/* Preview Panel */}
+          <div className="w-full max-h-[45%] flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Preview</span>
+              <Button
+                size="sm"
+                className="h-7"
+                onClick={goLive}
+                disabled={previewVerses.length === 0 && !currentVerseText}
+              >
+                Go Live
+              </Button>
+            </div>
+            <Card
+              className={`w-full flex-1 aspect-video ${darkMode ? "bg-black text-white" : "bg-white text-black"} overflow-hidden`}
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              <CardContent className="h-full flex flex-col justify-center items-center text-center p-4 xl:p-6 max-w-full overflow-auto">
+                {loading ? (
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                ) : previewVerses.length > 0 ? (
+                  <div className="space-y-4">
+                    {previewVerses.map((v) => (
+                      <div key={v.id}>
+                        <p
+                          className={`leading-relaxed font-serif ${
+                            v.reference ? "text-balance" : "whitespace-pre-wrap"
+                          } ${
+                            fontSize === "small"
+                              ? "text-sm"
+                              : fontSize === "medium"
+                                ? "text-base"
+                                : fontSize === "large"
+                                  ? "text-lg"
+                                  : "text-2xl"
+                          }`}
+                        >
+                          {v.text}
+                        </p>
+                        {v.reference && (
+                          <p
+                            className={`mt-4 font-bold italic ${darkMode ? "text-gray-400" : "text-gray-600"} ${
+                              fontSize === "small"
+                                ? "text-sm"
+                                : fontSize === "medium"
+                                  ? "text-base"
+                                  : fontSize === "large"
+                                    ? "text-lg"
+                                    : "text-xl"
+                            }`}
+                          >
+                            {v.reference} (KJV)
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : currentVerseText ? (
+                  <div>
+                    <p
+                      className={`leading-relaxed font-serif ${
+                        currentReference ? "text-balance" : "whitespace-pre-wrap"
+                      } ${
+                        fontSize === "small"
+                          ? "text-sm"
+                          : fontSize === "medium"
+                            ? "text-base"
+                            : fontSize === "large"
+                              ? "text-lg"
+                              : "text-2xl"
+                      }`}
+                    >
+                      {currentVerseText}
+                    </p>
+                    {currentReference && (
+                      <p
+                        className={`mt-4 font-bold italic ${darkMode ? "text-gray-400" : "text-gray-600"} ${
+                          fontSize === "small"
+                            ? "text-sm"
+                            : fontSize === "medium"
+                              ? "text-base"
+                              : fontSize === "large"
+                                ? "text-lg"
+                                : "text-xl"
+                        }`}
+                      >
+                        {currentReference} (KJV)
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm">Select a verse to preview</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Live Panel */}
+          <div className="w-full max-h-[45%] flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium flex items-center gap-2">
+                {liveVerses.length > 0 && <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
+                Live
+              </span>
+              <Button size="sm" variant="outline" className="h-7 bg-transparent" onClick={openSlideshowWindow}>
+                <ExternalLink className="h-3 w-3 mr-1" />
+                Window
+              </Button>
+            </div>
+            <Card
+              className={`w-full flex-1 aspect-video border-2 border-red-500 ${darkMode ? "bg-black text-white" : "bg-white text-black"} overflow-hidden`}
+            >
+              <CardContent className="h-full flex flex-col justify-center items-center text-center p-4 xl:p-6 max-w-full overflow-auto">
+                {liveVerses.length > 0 ? (
+                  <div className="space-y-4">
+                    {liveVerses.map((v) => (
+                      <div key={v.id}>
+                        <p
+                          className={`leading-relaxed font-serif ${
+                            v.reference ? "text-balance" : "whitespace-pre-wrap"
+                          } ${
+                            fontSize === "small"
+                              ? "text-sm"
+                              : fontSize === "medium"
+                                ? "text-base"
+                                : fontSize === "large"
+                                  ? "text-lg"
+                                  : "text-2xl"
+                          }`}
+                        >
+                          {v.text}
+                        </p>
+                        {v.reference && (
+                          <p
+                            className={`mt-4 font-bold italic ${darkMode ? "text-gray-400" : "text-gray-600"} ${
+                              fontSize === "small"
+                                ? "text-sm"
+                                : fontSize === "medium"
+                                  ? "text-base"
+                                  : fontSize === "large"
+                                    ? "text-lg"
+                                    : "text-xl"
+                            }`}
+                          >
+                            {v.reference} (KJV)
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm">Nothing is live</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Queue Display */}
+        <div className="px-4 xl:px-6 pb-4">
+          {selectedVerses.length > 0 && (
+            <div className="flex flex-wrap gap-2 max-w-4xl mx-auto w-full">
+              {selectedVerses.map((v) => (
+                <span key={v.id} className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded-md text-xs">
+                  {v.reference || "Note"}
+                  <button
+                    onClick={() => setSelectedVerses((prev) => prev.filter((pv) => pv.id !== v.id))}
+                    className="hover:text-destructive"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-      </main>
+      </div>
+
+      {/* Bible Selector - Shows second on mobile */}
+      <div className="h-[50vh] xl:h-full min-h-0 flex border-t xl:border-t-0 xl:border-r border-border order-2 xl:order-1 overflow-hidden">
+        {/* Sidebar with Tabs */}
+        <div className="w-48 xl:w-64 border-r border-border flex flex-col h-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
+            <div className="p-2 border-b border-border shrink-0">
+              <TabsList className="w-full grid grid-cols-3 h-10">
+                <TabsTrigger value="bible" className="text-xs px-2 gap-1">
+                  <Book className="h-3.5 w-3.5" />
+                  <span className="hidden xl:inline">Bible</span>
+                </TabsTrigger>
+                <TabsTrigger value="notes" className="text-xs px-2 gap-1">
+                  <FileText className="h-3.5 w-3.5" />
+                  <span className="hidden xl:inline">Notes</span>
+                </TabsTrigger>
+                <TabsTrigger value="history" className="text-xs px-2 gap-1">
+                  <History className="h-3.5 w-3.5" />
+                  <span className="hidden xl:inline">History</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            {/* Bible Books Tab */}
+            <TabsContent value="bible" className="flex-1 m-0 min-h-0 flex flex-col">
+              <ScrollArea className="flex-1 min-h-0">
+                <div className="p-2">
+                  <p className="text-xs font-medium text-muted-foreground px-2 py-1">Old Testament</p>
+                  {oldTestament.map((book) => (
+                    <button
+                      key={book.name}
+                      onClick={() => handleBookSelect(book)}
+                      className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
+                        selectedBook?.name === book.name ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                      }`}
+                    >
+                      {book.name}
+                    </button>
+                  ))}
+                  <p className="text-xs font-medium text-muted-foreground px-2 py-1 mt-4">New Testament</p>
+                  {newTestament.map((book) => (
+                    <button
+                      key={book.name}
+                      onClick={() => handleBookSelect(book)}
+                      className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
+                        selectedBook?.name === book.name ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                      }`}
+                    >
+                      {book.name}
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            {/* Notes Tab */}
+            <TabsContent value="notes" className="flex-1 m-0 min-h-0 flex flex-col p-4">
+              <div className="space-y-4 flex flex-col h-full">
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Title (optional)</label>
+                  <Input
+                    placeholder="e.g., Sermon Point 1"
+                    value={customNoteTitle}
+                    onChange={(e) => setCustomNoteTitle(e.target.value)}
+                  />
+                </div>
+                <div className="flex-1 flex flex-col min-h-0">
+                  <label className="text-sm font-medium mb-1.5 block">Note Text</label>
+                  <Textarea
+                    placeholder="Type your custom text here..."
+                    value={customNoteText}
+                    onChange={(e) => setCustomNoteText(e.target.value)}
+                    className="flex-1 resize-none min-h-24"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Button
+                    onClick={previewNote}
+                    variant="outline"
+                    className="w-full gap-2 bg-transparent"
+                    disabled={!customNoteText.trim()}
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    Preview Note
+                  </Button>
+                  <Button onClick={projectCustomNote} className="w-full gap-2" disabled={!customNoteText.trim()}>
+                    <ExternalLink className="h-4 w-4" />
+                    Project Note
+                  </Button>
+                  <Button
+                    onClick={addCustomNoteToQueue}
+                    variant="outline"
+                    className="w-full gap-2 bg-transparent"
+                    disabled={!customNoteText.trim()}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add to Queue
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* History Tab */}
+            <TabsContent value="history" className="flex-1 m-0 min-h-0 flex flex-col">
+              <ScrollArea className="flex-1 min-h-0">
+                <div className="p-2 space-y-1">
+                  {history.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No history yet</p>
+                  ) : (
+                    history.map((item, index) => (
+                      <button
+                        key={index}
+                        onClick={() => projectFromHistory(item)}
+                        className="w-full text-left p-2 rounded-md hover:bg-muted transition-colors"
+                      >
+                        <p className="font-medium text-sm truncate">{item.reference || "Note"}</p>
+                        <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-3">{item.text}</p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+              {history.length > 0 && (
+                <div className="p-2 border-t border-border">
+                  <Button onClick={clearHistory} variant="ghost" size="sm" className="w-full text-muted-foreground">
+                    <X className="h-4 w-4 mr-2" />
+                    Clear History
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {activeTab === "bible" && selectedBook && (
+          <div className="w-28 xl:w-36 border-r border-border flex flex-col h-full">
+            <div className="p-2 xl:p-4 border-b border-border shrink-0">
+              <h2 className="font-semibold text-xs xl:text-sm">Chapters</h2>
+            </div>
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="p-2">
+                {selectedBook?.chapters.map((_, index) => (
+                  <button
+                    key={index + 1}
+                    onClick={() => handleChapterSelect(index + 1)}
+                    className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
+                      selectedChapter === index + 1 ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                    }`}
+                  >
+                    Chapter {index + 1}
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+
+        {activeTab === "bible" && selectedBook && selectedChapter && (
+          <div className="w-28 xl:w-36 border-r border-border flex flex-col h-full">
+            <div className="p-2 xl:p-4 border-b border-border shrink-0">
+              <h2 className="font-semibold text-xs xl:text-sm">Verses</h2>
+            </div>
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="p-2">
+                {Array.from({ length: selectedBook.chapters[selectedChapter - 1] }, (_, i) => i + 1).map((verse) => (
+                  <button
+                    key={verse}
+                    onClick={() => handleVerseSelect(verse)}
+                    onDoubleClick={() => handleVerseDoubleClick(verse)}
+                    className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
+                      selectedVerse === verse ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                    }`}
+                  >
+                    Verse {verse}
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+      </div>
     </div>
-  );
+  )
 }
