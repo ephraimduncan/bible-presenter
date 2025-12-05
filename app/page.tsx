@@ -71,6 +71,7 @@ export default function ControlPanel() {
   const [activeTab, setActiveTab] = useState("bible")
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [selectedVersion, setSelectedVersion] = useState("KJV")
+  const [bookSearch, setBookSearch] = useState("")
 
   useEffect(() => {
     const savedHistory = localStorage.getItem("biblePresenterHistory")
@@ -398,6 +399,14 @@ export default function ControlPanel() {
     { value: "extra-large", label: "XL" },
   ]
 
+  // Filter books based on search query
+  const filteredOldTestament = oldTestament.filter((book) =>
+    book.name.toLowerCase().includes(bookSearch.toLowerCase())
+  )
+  const filteredNewTestament = newTestament.filter((book) =>
+    book.name.toLowerCase().includes(bookSearch.toLowerCase())
+  )
+
   const handleBookSelect = (book: BibleBook) => {
     setSelectedBook(book)
     setSelectedChapter(null)
@@ -406,6 +415,7 @@ export default function ControlPanel() {
     setRangeEndVerse(null)
     setCurrentVerseText("")
     setCurrentReference("")
+    setBookSearch("")
   }
 
   const handleChapterSelect = (chapter: number) => {
@@ -810,32 +820,51 @@ export default function ControlPanel() {
 
             {/* Bible Books Tab */}
             <TabsContent value="bible" className="flex-1 m-0 min-h-0 flex flex-col">
+              <div className="p-2 border-b border-border">
+                <Input
+                  placeholder="Search books..."
+                  value={bookSearch}
+                  onChange={(e) => setBookSearch(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
               <ScrollArea className="flex-1 min-h-0">
                 <div className="p-2">
-                  <p className="text-xs font-medium text-muted-foreground px-2 py-1">Old Testament</p>
-                  {oldTestament.map((book) => (
-                    <button
-                      key={book.name}
-                      onClick={() => handleBookSelect(book)}
-                      className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
-                        selectedBook?.name === book.name ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                      }`}
-                    >
-                      {book.name}
-                    </button>
-                  ))}
-                  <p className="text-xs font-medium text-muted-foreground px-2 py-1 mt-4">New Testament</p>
-                  {newTestament.map((book) => (
-                    <button
-                      key={book.name}
-                      onClick={() => handleBookSelect(book)}
-                      className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
-                        selectedBook?.name === book.name ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                      }`}
-                    >
-                      {book.name}
-                    </button>
-                  ))}
+                  {filteredOldTestament.length > 0 && (
+                    <>
+                      <p className="text-xs font-medium text-muted-foreground px-2 py-1">Old Testament</p>
+                      {filteredOldTestament.map((book) => (
+                        <button
+                          key={book.name}
+                          onClick={() => handleBookSelect(book)}
+                          className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
+                            selectedBook?.name === book.name ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                          }`}
+                        >
+                          {book.name}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {filteredNewTestament.length > 0 && (
+                    <>
+                      <p className={`text-xs font-medium text-muted-foreground px-2 py-1 ${filteredOldTestament.length > 0 ? "mt-4" : ""}`}>New Testament</p>
+                      {filteredNewTestament.map((book) => (
+                        <button
+                          key={book.name}
+                          onClick={() => handleBookSelect(book)}
+                          className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
+                            selectedBook?.name === book.name ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                          }`}
+                        >
+                          {book.name}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {filteredOldTestament.length === 0 && filteredNewTestament.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">No books found</p>
+                  )}
                 </div>
               </ScrollArea>
             </TabsContent>
