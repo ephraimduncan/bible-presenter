@@ -3,6 +3,22 @@ export interface BibleBook {
   chapters: number[]
 }
 
+export interface BibleVersion {
+  code: string
+  name: string
+}
+
+export const BIBLE_VERSIONS: BibleVersion[] = [
+  { code: "KJV", name: "King James Version" },
+  { code: "ASV", name: "American Standard Version" },
+  { code: "NLT", name: "New Living Translation" },
+  { code: "AMP", name: "Amplified Bible" },
+  { code: "NIV", name: "New International Version" },
+  { code: "ESV", name: "English Standard Version" },
+  { code: "NASB", name: "New American Standard Bible" },
+  { code: "NKJV", name: "New King James Version" },
+]
+
 export const oldTestament: BibleBook[] = [
   {
     name: "Genesis",
@@ -191,7 +207,13 @@ export const newTestament: BibleBook[] = [
 
 export const allBooks = [...oldTestament, ...newTestament]
 
-// Format book name for API (e.g., "1 Samuel" -> "1samuel")
-export function formatBookForApi(bookName: string): string {
-  return bookName.toLowerCase().replace(/\s+/g, "")
+// Get numeric book ID for Bolls.life API (1-indexed)
+export function getBookId(bookName: string): number {
+  const index = allBooks.findIndex((b) => b.name === bookName)
+  return index + 1
+}
+
+// Strip Strong's concordance numbers from text (e.g., "<S>7225</S>" -> "")
+export function stripStrongsNumbers(text: string): string {
+  return text.replace(/<S>\d+<\/S>/g, "")
 }

@@ -11,12 +11,14 @@ interface SelectedVerse {
   verse: number
   text: string
   reference: string
+  version?: string
 }
 
 interface VerseData {
   verses: SelectedVerse[]
   fontSize: FontSize
   darkMode: boolean
+  version?: string
 }
 
 const fontSizeClasses: Record<FontSize, string> = {
@@ -38,6 +40,7 @@ export default function SlideshowPage() {
     verses: [],
     fontSize: "extra-large", // default to extra-large
     darkMode: true,
+    version: "KJV",
   })
 
   useEffect(() => {
@@ -161,13 +164,12 @@ export default function SlideshowPage() {
               {/* Verse Text */}
               <p
                 className={`${fontSizeClasses[data.fontSize]} leading-relaxed font-serif ${verse.reference ? "text-balance" : "whitespace-pre-wrap"}`}
-              >
-                {verse.text}
-              </p>
+                dangerouslySetInnerHTML={{ __html: verse.text }}
+              />
 
               {verse.reference && verse.reference.trim() !== "" && (
                 <p className={`mt-6 ${referenceSizeClasses[data.fontSize]} ${referenceColor} font-bold italic`}>
-                  {verse.reference} (KJV)
+                  {verse.reference} ({verse.version || data.version || "KJV"})
                 </p>
               )}
             </div>
