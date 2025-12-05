@@ -7,8 +7,22 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { ExternalLink, Moon, Sun, Book, BookOpen, Loader2, X, Plus, FileText, History } from "lucide-react"
-import { oldTestament, newTestament, formatBookForApi, type BibleBook } from "@/lib/bible-data"
+import {
+  oldTestament,
+  newTestament,
+  getBookId,
+  stripStrongsNumbers,
+  BIBLE_VERSIONS,
+  type BibleBook,
+} from "@/lib/bible-data"
 
 type FontSize = "small" | "medium" | "large" | "extra-large"
 
@@ -19,12 +33,14 @@ interface SelectedVerse {
   verse: number
   text: string
   reference: string
+  version?: string
 }
 
 interface VerseData {
   verses: SelectedVerse[]
   fontSize: FontSize
   darkMode: boolean
+  version: string
 }
 
 interface HistoryItem {
@@ -52,13 +68,22 @@ export default function ControlPanel() {
   const [customNoteText, setCustomNoteText] = useState("")
   const [activeTab, setActiveTab] = useState("bible")
   const [history, setHistory] = useState<HistoryItem[]>([])
+  const [selectedVersion, setSelectedVersion] = useState("KJV")
 
   useEffect(() => {
     const savedHistory = localStorage.getItem("biblePresenterHistory")
     if (savedHistory) {
       setHistory(JSON.parse(savedHistory))
     }
+    const savedVersion = localStorage.getItem("bibleVersion")
+    if (savedVersion) {
+      setSelectedVersion(savedVersion)
+    }
   }, [])
+
+  useEffect(() => {
+    localStorage.setItem("bibleVersion", selectedVersion)
+  }, [selectedVersion])
 
   const addToHistory = (text: string, reference: string) => {
     const newItem: HistoryItem = {
@@ -88,6 +113,7 @@ export default function ControlPanel() {
       verses: [verse],
       fontSize,
       darkMode,
+      version: selectedVersion,
     }
     localStorage.setItem("bibleVerseData", JSON.stringify(data))
     window.dispatchEvent(new Event("storage"))
@@ -141,17 +167,32 @@ export default function ControlPanel() {
     if (selectedBook && selectedChapter && selectedVerse) {
       fetchVerse(selectedBook.name, selectedChapter, selectedVerse)
     }
-  }, [selectedBook, selectedChapter, selectedVerse])
+  }, [selectedBook, selectedChapter, selectedVerse, selectedVersion])
 
   const fetchVerse = async (book: string, chapter: number, verse: number) => {
     setLoading(true)
     try {
-      const bookForApi = formatBookForApi(book)
-      const response = await fetch(`https://bible-api.com/${bookForApi}+${chapter}:${verse}?translation=kjv`)
+      const bookId = getBookId(book)
+      const response = await fetch(
+        `https://bolls.life/get-verse/${selectedVersion}/${bookId}/${chapter}/${verse}/`
+      )
       const data = await response.json()
       if (data.text) {
-        setCurrentVerseText(data.text.trim())
-        setCurrentReference(`${book} ${chapter}:${verse}`)
+        const verseText = stripStrongsNumbers(data.text).trim()
+        const reference = `${book} ${chapter}:${verse}`
+        setCurrentVerseText(verseText)
+        setCurrentReference(reference)
+        // Update previewVerses so the UI reflects the new version
+        const newVerse: SelectedVerse = {
+          id: `${book}-${chapter}-${verse}`,
+          book,
+          chapter,
+          verse,
+          text: verseText,
+          reference,
+          version: selectedVersion,
+        }
+        setPreviewVerses([newVerse])
       } else {
         setCurrentVerseText("Verse not found")
         setCurrentReference(`${book} ${chapter}:${verse}`)
@@ -204,23 +245,27 @@ export default function ControlPanel() {
     const versesToProject =
       selectedVerses.length > 0
         ? selectedVerses
-        : currentVerseText
-          ? [
-              {
-                id: "single",
-                book: selectedBook?.name || "",
-                chapter: selectedChapter || 0,
-                verse: selectedVerse || 0,
-                text: currentVerseText,
-                reference: currentReference,
-              },
-            ]
-          : []
+        : previewVerses.length > 0
+          ? previewVerses
+          : currentVerseText
+            ? [
+                {
+                  id: "single",
+                  book: selectedBook?.name || "",
+                  chapter: selectedChapter || 0,
+                  verse: selectedVerse || 0,
+                  text: currentVerseText,
+                  reference: currentReference,
+                  version: selectedVersion,
+                },
+              ]
+            : []
 
     const data: VerseData = {
       verses: versesToProject,
       fontSize,
       darkMode,
+      version: selectedVersion,
     }
     localStorage.setItem("bibleVerseData", JSON.stringify(data))
     window.dispatchEvent(new Event("storage"))
@@ -250,6 +295,7 @@ export default function ControlPanel() {
       verses: [noteVerse],
       fontSize,
       darkMode,
+      version: selectedVersion,
     }
     localStorage.setItem("bibleVerseData", JSON.stringify(noteData))
     window.dispatchEvent(new Event("storage"))
@@ -310,12 +356,14 @@ export default function ControlPanel() {
     setLoading(true)
 
     try {
-      const bookForApi = formatBookForApi(selectedBook.name)
-      const response = await fetch(`https://bible-api.com/${bookForApi}+${selectedChapter}:${verse}?translation=kjv`)
+      const bookId = getBookId(selectedBook.name)
+      const response = await fetch(
+        `https://bolls.life/get-verse/${selectedVersion}/${bookId}/${selectedChapter}/${verse}/`
+      )
       const data = await response.json()
 
       if (data.text) {
-        const verseText = data.text.trim()
+        const verseText = stripStrongsNumbers(data.text).trim()
         const reference = `${selectedBook.name} ${selectedChapter}:${verse}`
 
         setCurrentVerseText(verseText)
@@ -328,6 +376,7 @@ export default function ControlPanel() {
           verse: verse,
           text: verseText,
           reference: reference,
+          version: selectedVersion,
         }
         setPreviewVerses([newVerse])
       }
@@ -344,12 +393,14 @@ export default function ControlPanel() {
     setLoading(true)
 
     try {
-      const bookForApi = formatBookForApi(selectedBook.name)
-      const response = await fetch(`https://bible-api.com/${bookForApi}+${selectedChapter}:${verse}?translation=kjv`)
+      const bookId = getBookId(selectedBook.name)
+      const response = await fetch(
+        `https://bolls.life/get-verse/${selectedVersion}/${bookId}/${selectedChapter}/${verse}/`
+      )
       const data = await response.json()
 
       if (data.text) {
-        const verseText = data.text.trim()
+        const verseText = stripStrongsNumbers(data.text).trim()
         const reference = `${selectedBook.name} ${selectedChapter}:${verse}`
 
         setCurrentVerseText(verseText)
@@ -362,14 +413,16 @@ export default function ControlPanel() {
           verse: verse,
           text: verseText,
           reference: reference,
+          version: selectedVersion,
         }
         setPreviewVerses([newVerse])
         setLiveVerses([newVerse])
 
-        const verseData = {
+        const verseData: VerseData = {
           verses: [newVerse],
           fontSize,
           darkMode,
+          version: selectedVersion,
         }
         localStorage.setItem("bibleVerseData", JSON.stringify(verseData))
         window.dispatchEvent(new Event("storage"))
@@ -384,7 +437,7 @@ export default function ControlPanel() {
 
   const goLive = () => {
     if (previewVerses.length > 0) {
-      setLiveVerses(previewVerses)
+      setLiveVerses([...previewVerses])
       updateSlide()
     } else if (currentVerseText) {
       const newVerse: SelectedVerse = {
@@ -394,6 +447,7 @@ export default function ControlPanel() {
         verse: selectedVerse || 0,
         text: currentVerseText,
         reference: currentReference,
+        version: selectedVersion,
       }
       setLiveVerses([newVerse])
       updateSlide()
@@ -416,6 +470,19 @@ export default function ControlPanel() {
             Display
           </h2>
           <div className="flex items-center gap-2">
+            {/* Version Selector */}
+            <Select value={selectedVersion} onValueChange={setSelectedVersion}>
+              <SelectTrigger size="sm" className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {BIBLE_VERSIONS.map((v) => (
+                  <SelectItem key={v.code} value={v.code}>
+                    {v.code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {/* Font Size */}
             <div className="flex gap-1">
               {fontSizeOptions.map((option) => (
@@ -479,9 +546,8 @@ export default function ControlPanel() {
                                   ? "text-lg"
                                   : "text-2xl"
                           }`}
-                        >
-                          {v.text}
-                        </p>
+                          dangerouslySetInnerHTML={{ __html: v.text }}
+                        />
                         {v.reference && (
                           <p
                             className={`mt-4 font-bold italic ${darkMode ? "text-gray-400" : "text-gray-600"} ${
@@ -494,7 +560,7 @@ export default function ControlPanel() {
                                     : "text-xl"
                             }`}
                           >
-                            {v.reference} (KJV)
+                            {v.reference} ({v.version || "KJV"})
                           </p>
                         )}
                       </div>
@@ -514,9 +580,8 @@ export default function ControlPanel() {
                               ? "text-lg"
                               : "text-2xl"
                       }`}
-                    >
-                      {currentVerseText}
-                    </p>
+                      dangerouslySetInnerHTML={{ __html: currentVerseText }}
+                    />
                     {currentReference && (
                       <p
                         className={`mt-4 font-bold italic ${darkMode ? "text-gray-400" : "text-gray-600"} ${
@@ -529,7 +594,7 @@ export default function ControlPanel() {
                                 : "text-xl"
                         }`}
                       >
-                        {currentReference} (KJV)
+                        {currentReference} ({selectedVersion})
                       </p>
                     )}
                   </div>
@@ -572,9 +637,8 @@ export default function ControlPanel() {
                                   ? "text-lg"
                                   : "text-2xl"
                           }`}
-                        >
-                          {v.text}
-                        </p>
+                          dangerouslySetInnerHTML={{ __html: v.text }}
+                        />
                         {v.reference && (
                           <p
                             className={`mt-4 font-bold italic ${darkMode ? "text-gray-400" : "text-gray-600"} ${
@@ -587,7 +651,7 @@ export default function ControlPanel() {
                                     : "text-xl"
                             }`}
                           >
-                            {v.reference} (KJV)
+                            {v.reference} ({v.version || "KJV"})
                           </p>
                         )}
                       </div>
