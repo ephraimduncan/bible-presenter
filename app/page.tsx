@@ -54,6 +54,8 @@ export default function ControlPanel() {
   const [selectedBook, setSelectedBook] = useState<BibleBook | null>(null)
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null)
   const [selectedVerse, setSelectedVerse] = useState<number | null>(null)
+  const [rangeStartVerse, setRangeStartVerse] = useState<number | null>(null)
+  const [rangeEndVerse, setRangeEndVerse] = useState<number | null>(null)
   const [currentVerseText, setCurrentVerseText] = useState("")
   const [currentReference, setCurrentReference] = useState("")
   const [selectedVerses, setSelectedVerses] = useState<SelectedVerse[]>([])
@@ -164,10 +166,15 @@ export default function ControlPanel() {
   }, [currentReference, selectedBook])
 
   useEffect(() => {
-    if (selectedBook && selectedChapter && selectedVerse) {
-      fetchVerse(selectedBook.name, selectedChapter, selectedVerse)
+    if (selectedBook && selectedChapter) {
+      // If a range is selected, re-fetch the entire range
+      if (rangeStartVerse !== null && rangeEndVerse !== null) {
+        fetchVerseRange(selectedBook.name, selectedChapter, rangeStartVerse, rangeEndVerse)
+      } else if (selectedVerse) {
+        fetchVerse(selectedBook.name, selectedChapter, selectedVerse)
+      }
     }
-  }, [selectedBook, selectedChapter, selectedVerse, selectedVersion])
+  }, [selectedBook, selectedChapter, selectedVerse, rangeStartVerse, rangeEndVerse, selectedVersion])
 
   const fetchVerse = async (book: string, chapter: number, verse: number) => {
     setLoading(true)
@@ -200,6 +207,63 @@ export default function ControlPanel() {
     } catch (error) {
       setCurrentVerseText("Error fetching verse. Please try again.")
       setCurrentReference(`${book} ${chapter}:${verse}`)
+    }
+    setLoading(false)
+  }
+
+  const fetchVerseRange = async (book: string, chapter: number, startVerse: number, endVerse: number) => {
+    setLoading(true)
+    try {
+      const bookId = getBookId(book)
+      const verses: SelectedVerse[] = []
+      const texts: string[] = []
+
+      // Fetch all verses in the range
+      for (let v = startVerse; v <= endVerse; v++) {
+        const response = await fetch(
+          `https://bolls.life/get-verse/${selectedVersion}/${bookId}/${chapter}/${v}/`
+        )
+        const data = await response.json()
+        if (data.text) {
+          const verseText = stripStrongsNumbers(data.text).trim()
+          texts.push(`<sup class="text-blue-500 font-semibold mr-1">${v}</sup>${verseText}`)
+          verses.push({
+            id: `${book}-${chapter}-${v}`,
+            book,
+            chapter,
+            verse: v,
+            text: verseText,
+            reference: `${book} ${chapter}:${v}`,
+            version: selectedVersion,
+          })
+        }
+      }
+
+      if (texts.length > 0) {
+        // Combine all verse texts
+        const combinedText = texts.join(" ")
+        const reference = startVerse === endVerse
+          ? `${book} ${chapter}:${startVerse}`
+          : `${book} ${chapter}:${startVerse}-${endVerse}`
+
+        setCurrentVerseText(combinedText)
+        setCurrentReference(reference)
+
+        // Create a single combined verse for preview
+        const combinedVerse: SelectedVerse = {
+          id: `${book}-${chapter}-${startVerse}-${endVerse}`,
+          book,
+          chapter,
+          verse: startVerse,
+          text: combinedText,
+          reference,
+          version: selectedVersion,
+        }
+        setPreviewVerses([combinedVerse])
+      }
+    } catch (error) {
+      setCurrentVerseText("Error fetching verses. Please try again.")
+      setCurrentReference(`${book} ${chapter}:${startVerse}-${endVerse}`)
     }
     setLoading(false)
   }
@@ -338,6 +402,8 @@ export default function ControlPanel() {
     setSelectedBook(book)
     setSelectedChapter(null)
     setSelectedVerse(null)
+    setRangeStartVerse(null)
+    setRangeEndVerse(null)
     setCurrentVerseText("")
     setCurrentReference("")
   }
@@ -345,14 +411,30 @@ export default function ControlPanel() {
   const handleChapterSelect = (chapter: number) => {
     setSelectedChapter(chapter)
     setSelectedVerse(null)
+    setRangeStartVerse(null)
+    setRangeEndVerse(null)
     setCurrentVerseText("")
     setCurrentReference("")
   }
 
-  const handleVerseSelect = async (verse: number) => {
+  const handleVerseSelect = async (verse: number, event?: React.MouseEvent) => {
     if (!selectedBook || !selectedChapter) return
 
+    // Shift+click for range selection
+    if (event?.shiftKey && rangeStartVerse !== null) {
+      const start = Math.min(rangeStartVerse, verse)
+      const end = Math.max(rangeStartVerse, verse)
+      setRangeEndVerse(end)
+      setRangeStartVerse(start)
+      setSelectedVerse(verse)
+      await fetchVerseRange(selectedBook.name, selectedChapter, start, end)
+      return
+    }
+
+    // Regular click - set as start of potential range
     setSelectedVerse(verse)
+    setRangeStartVerse(verse)
+    setRangeEndVerse(null)
     setLoading(true)
 
     try {
@@ -389,7 +471,26 @@ export default function ControlPanel() {
   const handleVerseDoubleClick = async (verse: number) => {
     if (!selectedBook || !selectedChapter) return
 
+    // If there's a range selected and double-clicking on a verse in that range, go live with the range
+    if (rangeStartVerse !== null && rangeEndVerse !== null &&
+        verse >= rangeStartVerse && verse <= rangeEndVerse &&
+        previewVerses.length > 0) {
+      setLiveVerses([...previewVerses])
+      const verseData: VerseData = {
+        verses: previewVerses,
+        fontSize,
+        darkMode,
+        version: selectedVersion,
+      }
+      localStorage.setItem("bibleVerseData", JSON.stringify(verseData))
+      window.dispatchEvent(new Event("storage"))
+      previewVerses.forEach((v) => addToHistory(v.text, v.reference))
+      return
+    }
+
     setSelectedVerse(verse)
+    setRangeStartVerse(verse)
+    setRangeEndVerse(null)
     setLoading(true)
 
     try {
@@ -845,21 +946,33 @@ export default function ControlPanel() {
           <div className="w-28 xl:w-36 border-r border-border flex flex-col h-full">
             <div className="p-2 xl:p-4 border-b border-border shrink-0">
               <h2 className="font-semibold text-xs xl:text-sm">Verses</h2>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Shift+click for range</p>
             </div>
             <ScrollArea className="flex-1 min-h-0">
               <div className="p-2">
-                {Array.from({ length: selectedBook.chapters[selectedChapter - 1] }, (_, i) => i + 1).map((verse) => (
-                  <button
-                    key={verse}
-                    onClick={() => handleVerseSelect(verse)}
-                    onDoubleClick={() => handleVerseDoubleClick(verse)}
-                    className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
-                      selectedVerse === verse ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                    }`}
-                  >
-                    Verse {verse}
-                  </button>
-                ))}
+                {Array.from({ length: selectedBook.chapters[selectedChapter - 1] }, (_, i) => i + 1).map((verse) => {
+                  const isInRange = rangeStartVerse !== null && rangeEndVerse !== null &&
+                    verse >= rangeStartVerse && verse <= rangeEndVerse
+                  const isRangeStart = verse === rangeStartVerse && rangeEndVerse === null
+                  const isSelected = selectedVerse === verse
+
+                  return (
+                    <button
+                      key={verse}
+                      onClick={(e) => handleVerseSelect(verse, e)}
+                      onDoubleClick={() => handleVerseDoubleClick(verse)}
+                      className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
+                        isInRange
+                          ? "bg-primary text-primary-foreground"
+                          : isRangeStart || isSelected
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-muted"
+                      }`}
+                    >
+                      Verse {verse}
+                    </button>
+                  )
+                })}
               </div>
             </ScrollArea>
           </div>
