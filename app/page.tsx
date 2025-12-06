@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import ReactMarkdown from "react-markdown"
 import rehypeRaw from "rehype-raw"
+import { HexColorPicker } from "react-colorful"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -16,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ExternalLink, Moon, Sun, Book, BookOpen, Loader2, X, Plus, FileText, History, Bold, Italic, Underline, List, ListOrdered, XCircle } from "lucide-react"
+import { ExternalLink, Moon, Sun, Book, BookOpen, Loader2, X, Plus, FileText, History, Bold, Italic, Underline, List, ListOrdered, Check, ImageIcon, RotateCcw } from "lucide-react"
 import {
   oldTestament,
   newTestament,
@@ -43,6 +44,8 @@ interface VerseData {
   fontSize: FontSize
   darkMode: boolean
   version: string
+  backgroundColor?: string
+  backgroundImage?: string
 }
 
 interface HistoryItem {
@@ -63,6 +66,10 @@ export default function ControlPanel() {
   const [selectedVerses, setSelectedVerses] = useState<SelectedVerse[]>([])
   const [fontSize, setFontSize] = useState<FontSize>("extra-large") // default to extra-large
   const [darkMode, setDarkMode] = useState(true)
+  const [backgroundColor, setBackgroundColor] = useState("#000000")
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null)
+  const [showColorPicker, setShowColorPicker] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [themeLoaded, setThemeLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [slideshowWindow, setSlideshowWindow] = useState<Window | null>(null)
@@ -113,6 +120,14 @@ export default function ControlPanel() {
     if (savedDarkMode !== null) {
       setDarkMode(JSON.parse(savedDarkMode))
     }
+    const savedBackgroundColor = localStorage.getItem("biblePresenterBackgroundColor")
+    if (savedBackgroundColor) {
+      setBackgroundColor(savedBackgroundColor)
+    }
+    const savedBackgroundImage = localStorage.getItem("biblePresenterBackgroundImage")
+    if (savedBackgroundImage) {
+      setBackgroundImage(savedBackgroundImage)
+    }
     setThemeLoaded(true)
   }, [])
 
@@ -123,6 +138,18 @@ export default function ControlPanel() {
   useEffect(() => {
     localStorage.setItem("biblePresenterDarkMode", JSON.stringify(darkMode))
   }, [darkMode])
+
+  useEffect(() => {
+    localStorage.setItem("biblePresenterBackgroundColor", backgroundColor)
+  }, [backgroundColor])
+
+  useEffect(() => {
+    if (backgroundImage) {
+      localStorage.setItem("biblePresenterBackgroundImage", backgroundImage)
+    } else {
+      localStorage.removeItem("biblePresenterBackgroundImage")
+    }
+  }, [backgroundImage])
 
   const addToHistory = (text: string, reference: string) => {
     const newItem: HistoryItem = {
@@ -153,6 +180,8 @@ export default function ControlPanel() {
       fontSize,
       darkMode,
       version: selectedVersion,
+      backgroundColor,
+      backgroundImage: backgroundImage || undefined,
     }
     localStorage.setItem("bibleVerseData", JSON.stringify(data))
     window.dispatchEvent(new Event("storage"))
@@ -379,6 +408,8 @@ export default function ControlPanel() {
       fontSize,
       darkMode,
       version: selectedVersion,
+      backgroundColor,
+      backgroundImage: backgroundImage || undefined,
     }
     localStorage.setItem("bibleVerseData", JSON.stringify(data))
     window.dispatchEvent(new Event("storage"))
@@ -409,6 +440,8 @@ export default function ControlPanel() {
       fontSize,
       darkMode,
       version: selectedVersion,
+      backgroundColor,
+      backgroundImage: backgroundImage || undefined,
     }
     localStorage.setItem("bibleVerseData", JSON.stringify(noteData))
     window.dispatchEvent(new Event("storage"))
@@ -455,6 +488,63 @@ export default function ControlPanel() {
     { value: "large", label: "L" },
     { value: "extra-large", label: "XL" },
   ]
+
+  const colorPalette = [
+    { value: "#000000", label: "Black" },
+    { value: "#FFFFFF", label: "White" },
+    { value: "#1e3a5f", label: "Navy" },
+    { value: "#0f172a", label: "Slate" },
+    { value: "#1a1a2e", label: "Dark Purple" },
+    { value: "#0d1b2a", label: "Deep Blue" },
+    { value: "#2d1b4e", label: "Plum" },
+    { value: "#1b4332", label: "Forest" },
+    { value: "#3d0c02", label: "Maroon" },
+    { value: "#1c1917", label: "Stone" },
+  ]
+
+  const handleColorSelect = (color: string) => {
+    setBackgroundColor(color)
+    setBackgroundImage(null) // Clear image when selecting a color
+  }
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string
+        setBackgroundImage(base64)
+      }
+      reader.readAsDataURL(file)
+    }
+    // Reset input so same file can be selected again
+    e.target.value = ""
+  }
+
+  const handleResetBackground = () => {
+    setBackgroundColor("#000000")
+    setBackgroundImage(null)
+  }
+
+  const getTextColorForBackground = (bgColor: string) => {
+    // Convert hex to RGB
+    const hex = bgColor.replace("#", "")
+    const r = parseInt(hex.substring(0, 2), 16)
+    const g = parseInt(hex.substring(2, 4), 16)
+    const b = parseInt(hex.substring(4, 6), 16)
+    // Calculate luminance
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return luminance > 0.5 ? "text-gray-900" : "text-white"
+  }
+
+  const getReferenceColorForBackground = (bgColor: string) => {
+    const hex = bgColor.replace("#", "")
+    const r = parseInt(hex.substring(0, 2), 16)
+    const g = parseInt(hex.substring(2, 4), 16)
+    const b = parseInt(hex.substring(4, 6), 16)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return luminance > 0.5 ? "text-gray-600" : "text-gray-400"
+  }
 
   // Filter books based on search query
   const filteredOldTestament = oldTestament.filter((book) =>
@@ -548,6 +638,8 @@ export default function ControlPanel() {
         fontSize,
         darkMode,
         version: selectedVersion,
+        backgroundColor,
+        backgroundImage: backgroundImage || undefined,
       }
       localStorage.setItem("bibleVerseData", JSON.stringify(verseData))
       window.dispatchEvent(new Event("storage"))
@@ -591,6 +683,8 @@ export default function ControlPanel() {
           fontSize,
           darkMode,
           version: selectedVersion,
+          backgroundColor,
+          backgroundImage: backgroundImage || undefined,
         }
         localStorage.setItem("bibleVerseData", JSON.stringify(verseData))
         window.dispatchEvent(new Event("storage"))
@@ -674,6 +768,138 @@ export default function ControlPanel() {
             >
               {darkMode ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
             </Button>
+            {/* Color Picker */}
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 w-7 p-0 bg-transparent"
+                onClick={() => setShowColorPicker(!showColorPicker)}
+              >
+                <div
+                  className="h-4 w-4 rounded-sm border border-border"
+                  style={{ backgroundColor: backgroundColor }}
+                />
+              </Button>
+              {showColorPicker && (
+                <div className="absolute right-0 top-full mt-2 z-50 bg-popover border border-border rounded-lg shadow-lg p-3 w-72">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium">Background</span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={handleResetBackground}
+                        title="Reset to default"
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1" />
+                        Reset
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => setShowColorPicker(false)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Current Background Preview */}
+                  {backgroundImage && (
+                    <div className="mb-3 relative">
+                      <div
+                        className="w-full h-20 rounded-md border border-border bg-cover bg-center"
+                        style={{ backgroundImage: `url(${backgroundImage})` }}
+                      />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="absolute top-1 right-1 h-6 px-2 text-xs"
+                        onClick={() => setBackgroundImage(null)}
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Remove
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Color Picker Gradient */}
+                  <div className="mb-3">
+                    <HexColorPicker
+                      color={backgroundColor}
+                      onChange={(color) => {
+                        setBackgroundColor(color)
+                        setBackgroundImage(null)
+                      }}
+                      style={{ width: "100%", height: "140px" }}
+                    />
+                  </div>
+
+                  {/* Preset Colors */}
+                  <div className="grid grid-cols-5 gap-2 mb-3">
+                    {colorPalette.map((color) => (
+                      <button
+                        key={color.value}
+                        className={`h-8 w-8 rounded-md border-2 transition-all ${
+                          !backgroundImage && backgroundColor.toUpperCase() === color.value.toUpperCase()
+                            ? "border-primary ring-2 ring-primary ring-offset-2"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                        style={{ backgroundColor: color.value }}
+                        onClick={() => handleColorSelect(color.value)}
+                        title={color.label}
+                      >
+                        {!backgroundImage && backgroundColor.toUpperCase() === color.value.toUpperCase() && (
+                          <Check className={`h-4 w-4 mx-auto ${
+                            color.value === "#FFFFFF" ? "text-gray-900" : "text-white"
+                          }`} />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Hex Input & Image Upload */}
+                  <div className="border-t border-border pt-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-8 w-8 rounded-md border border-border shrink-0"
+                        style={{ backgroundColor: backgroundColor }}
+                      />
+                      <Input
+                        value={backgroundColor}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          if (/^#([0-9A-Fa-f]{0,6})$/.test(val)) {
+                            setBackgroundColor(val)
+                            setBackgroundImage(null)
+                          }
+                        }}
+                        className="h-8 text-sm font-mono"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full h-8 bg-transparent"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <ImageIcon className="h-3.5 w-3.5 mr-2" />
+                      Upload Image
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -693,7 +919,13 @@ export default function ControlPanel() {
               </Button>
             </div>
             <Card
-              className={`w-full flex-1 aspect-video overflow-hidden transition-colors ${themeLoaded ? (darkMode ? "bg-black text-white" : "bg-white text-black") : "bg-neutral-900 text-white"}`}
+              className={`w-full flex-1 aspect-video overflow-hidden transition-colors ${themeLoaded ? (backgroundImage ? "text-white" : getTextColorForBackground(backgroundColor)) : "text-white"}`}
+              style={{
+                backgroundColor: themeLoaded ? backgroundColor : "#171717",
+                backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }}
             >
               <CardContent className="h-full flex flex-col justify-center items-center text-center p-4 xl:p-6 max-w-full overflow-auto">
                 {loading ? (
@@ -720,7 +952,7 @@ export default function ControlPanel() {
                               </p>
                             )}
                             <div
-                              className={`leading-relaxed font-serif prose max-w-none prose-ol:list-inside prose-ul:list-inside prose-ol:pl-0 prose-ul:pl-0 ${darkMode ? "prose-invert" : ""} ${
+                              className={`leading-relaxed font-serif prose max-w-none prose-ol:list-inside prose-ul:list-inside prose-ol:pl-0 prose-ul:pl-0 ${backgroundImage || getTextColorForBackground(backgroundColor) === "text-white" ? "prose-invert" : ""} ${
                                 fontSize === "small"
                                   ? "prose-sm"
                                   : fontSize === "medium"
@@ -751,7 +983,7 @@ export default function ControlPanel() {
                             />
                             {v.reference && (
                               <p
-                                className={`mt-4 font-bold italic ${themeLoaded ? (darkMode ? "text-gray-400" : "text-gray-600") : "text-gray-400"} ${
+                                className={`mt-4 font-bold italic ${themeLoaded ? (backgroundImage ? "text-gray-300" : getReferenceColorForBackground(backgroundColor)) : "text-gray-400"} ${
                                   fontSize === "small"
                                     ? "text-sm"
                                     : fontSize === "medium"
@@ -787,7 +1019,7 @@ export default function ControlPanel() {
                     />
                     {currentReference && (
                       <p
-                        className={`mt-4 font-bold italic ${themeLoaded ? (darkMode ? "text-gray-400" : "text-gray-600") : "text-gray-400"} ${
+                        className={`mt-4 font-bold italic ${themeLoaded ? (backgroundImage ? "text-gray-300" : getReferenceColorForBackground(backgroundColor)) : "text-gray-400"} ${
                           fontSize === "small"
                             ? "text-sm"
                             : fontSize === "medium"
@@ -834,7 +1066,13 @@ export default function ControlPanel() {
               </div>
             </div>
             <Card
-              className={`w-full flex-1 aspect-video border-2 border-red-500 overflow-hidden transition-colors ${themeLoaded ? (darkMode ? "bg-black text-white" : "bg-white text-black") : "bg-neutral-900 text-white"}`}
+              className={`w-full flex-1 aspect-video border-2 border-red-500 overflow-hidden transition-colors ${themeLoaded ? (backgroundImage ? "text-white" : getTextColorForBackground(backgroundColor)) : "text-white"}`}
+              style={{
+                backgroundColor: themeLoaded ? backgroundColor : "#171717",
+                backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }}
             >
               <CardContent className="h-full flex flex-col justify-center items-center text-center p-4 xl:p-6 max-w-full overflow-auto">
                 {liveVerses.length > 0 ? (
@@ -859,7 +1097,7 @@ export default function ControlPanel() {
                               </p>
                             )}
                             <div
-                              className={`leading-relaxed font-serif prose max-w-none prose-ol:list-inside prose-ul:list-inside prose-ol:pl-0 prose-ul:pl-0 ${darkMode ? "prose-invert" : ""} ${
+                              className={`leading-relaxed font-serif prose max-w-none prose-ol:list-inside prose-ul:list-inside prose-ol:pl-0 prose-ul:pl-0 ${backgroundImage || getTextColorForBackground(backgroundColor) === "text-white" ? "prose-invert" : ""} ${
                                 fontSize === "small"
                                   ? "prose-sm"
                                   : fontSize === "medium"
@@ -890,7 +1128,7 @@ export default function ControlPanel() {
                             />
                             {v.reference && (
                               <p
-                                className={`mt-4 font-bold italic ${themeLoaded ? (darkMode ? "text-gray-400" : "text-gray-600") : "text-gray-400"} ${
+                                className={`mt-4 font-bold italic ${themeLoaded ? (backgroundImage ? "text-gray-300" : getReferenceColorForBackground(backgroundColor)) : "text-gray-400"} ${
                                   fontSize === "small"
                                     ? "text-sm"
                                     : fontSize === "medium"

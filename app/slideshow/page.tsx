@@ -21,6 +21,8 @@ interface VerseData {
   fontSize: FontSize
   darkMode: boolean
   version?: string
+  backgroundColor?: string
+  backgroundImage?: string
 }
 
 const fontSizeClasses: Record<FontSize, string> = {
@@ -43,7 +45,26 @@ export default function SlideshowPage() {
     fontSize: "extra-large", // default to extra-large
     darkMode: true,
     version: "KJV",
+    backgroundColor: "#000000",
   })
+
+  const getTextColorForBackground = (bgColor: string) => {
+    const hex = bgColor.replace("#", "")
+    const r = parseInt(hex.substring(0, 2), 16)
+    const g = parseInt(hex.substring(2, 4), 16)
+    const b = parseInt(hex.substring(4, 6), 16)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return luminance > 0.5 ? "text-gray-900" : "text-white"
+  }
+
+  const getReferenceColorForBackground = (bgColor: string) => {
+    const hex = bgColor.replace("#", "")
+    const r = parseInt(hex.substring(0, 2), 16)
+    const g = parseInt(hex.substring(2, 4), 16)
+    const b = parseInt(hex.substring(4, 6), 16)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return luminance > 0.5 ? "text-gray-600" : "text-gray-400"
+  }
 
   useEffect(() => {
     const updateFavicon = (verseRef?: string) => {
@@ -87,6 +108,11 @@ export default function SlideshowPage() {
     if (stored) {
       try {
         const parsed = JSON.parse(stored)
+        // Also check for separately stored background settings
+        const storedBgColor = localStorage.getItem("biblePresenterBackgroundColor")
+        const storedBgImage = localStorage.getItem("biblePresenterBackgroundImage")
+        if (storedBgColor) parsed.backgroundColor = storedBgColor
+        if (storedBgImage) parsed.backgroundImage = storedBgImage
         setData(parsed)
         if (parsed.verses?.length > 0) {
           const firstVerse = parsed.verses[0]
@@ -105,6 +131,12 @@ export default function SlideshowPage() {
       if (updated) {
         try {
           const parsed = JSON.parse(updated)
+          // Also check for separately stored background settings
+          const storedBgColor = localStorage.getItem("biblePresenterBackgroundColor")
+          const storedBgImage = localStorage.getItem("biblePresenterBackgroundImage")
+          if (storedBgColor) parsed.backgroundColor = storedBgColor
+          if (storedBgImage) parsed.backgroundImage = storedBgImage
+          else parsed.backgroundImage = undefined
           setData(parsed)
           if (parsed.verses?.length > 0) {
             const firstVerse = parsed.verses[0]
@@ -123,11 +155,20 @@ export default function SlideshowPage() {
     // Poll for changes as a fallback
     const interval = setInterval(() => {
       const current = localStorage.getItem("bibleVerseData")
+      const storedBgColor = localStorage.getItem("biblePresenterBackgroundColor")
+      const storedBgImage = localStorage.getItem("biblePresenterBackgroundImage")
+
       if (current) {
         try {
           const parsed = JSON.parse(current)
+          // Apply background settings
+          if (storedBgColor) parsed.backgroundColor = storedBgColor
+          if (storedBgImage) parsed.backgroundImage = storedBgImage
+          else parsed.backgroundImage = undefined
+
+          const currentWithBg = JSON.stringify(parsed)
           setData((prev) => {
-            if (JSON.stringify(prev) !== current) {
+            if (JSON.stringify(prev) !== currentWithBg) {
               if (parsed.verses?.length > 0) {
                 const firstVerse = parsed.verses[0]
                 const title =
@@ -151,15 +192,22 @@ export default function SlideshowPage() {
     }
   }, [])
 
-  const bgColor = data.darkMode ? "bg-black" : "bg-white"
-  const textColor = data.darkMode ? "text-white" : "text-gray-900"
-  const referenceColor = data.darkMode ? "text-gray-400" : "text-gray-600"
+  const backgroundColor = data.backgroundColor || (data.darkMode ? "#000000" : "#FFFFFF")
+  const backgroundImage = data.backgroundImage
+  const textColor = backgroundImage ? "text-white" : getTextColorForBackground(backgroundColor)
+  const referenceColor = backgroundImage ? "text-gray-300" : getReferenceColorForBackground(backgroundColor)
 
   const isNote = (verse: SelectedVerse) => verse.id.startsWith("note-") || verse.id.startsWith("history-")
 
   return (
     <div
-      className={`min-h-screen ${bgColor} ${textColor} flex flex-col items-center justify-center p-8 md:p-12 lg:p-16`}
+      className={`min-h-screen ${textColor} flex flex-col items-center justify-center p-8 md:p-12 lg:p-16`}
+      style={{
+        backgroundColor,
+        backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
     >
       {data.verses.length > 0 ? (
         <div className="max-w-5xl w-full text-center space-y-12">
@@ -173,7 +221,7 @@ export default function SlideshowPage() {
                     </p>
                   )}
                   <div
-                    className={`leading-relaxed font-serif prose max-w-none prose-ol:list-inside prose-ul:list-inside prose-ol:pl-0 prose-ul:pl-0 ${data.darkMode ? "prose-invert" : ""} ${
+                    className={`leading-relaxed font-serif prose max-w-none prose-ol:list-inside prose-ul:list-inside prose-ol:pl-0 prose-ul:pl-0 ${textColor === "text-white" ? "prose-invert" : ""} ${
                       data.fontSize === "small"
                         ? "prose-lg"
                         : data.fontSize === "medium"
