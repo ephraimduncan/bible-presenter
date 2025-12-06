@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import ReactMarkdown from "react-markdown"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -402,6 +403,8 @@ export default function ControlPanel() {
     setCurrentReference(customNoteTitle.trim() || "")
   }
 
+  const isNote = (verse: SelectedVerse) => verse.id.startsWith("note-") || verse.id.startsWith("history-")
+
   const fontSizeOptions: { value: FontSize; label: string }[] = [
     { value: "small", label: "S" },
     { value: "medium", label: "M" },
@@ -655,34 +658,69 @@ export default function ControlPanel() {
                   <div className="space-y-4">
                     {previewVerses.map((v) => (
                       <div key={v.id}>
-                        <p
-                          className={`leading-relaxed font-serif ${
-                            v.reference ? "text-balance" : "whitespace-pre-wrap"
-                          } ${
-                            fontSize === "small"
-                              ? "text-sm"
-                              : fontSize === "medium"
-                                ? "text-base"
-                                : fontSize === "large"
-                                  ? "text-lg"
-                                  : "text-2xl"
-                          }`}
-                          dangerouslySetInnerHTML={{ __html: v.text }}
-                        />
-                        {v.reference && (
-                          <p
-                            className={`mt-4 font-bold italic ${themeLoaded ? (darkMode ? "text-gray-400" : "text-gray-600") : "text-gray-400"} ${
-                              fontSize === "small"
-                                ? "text-sm"
-                                : fontSize === "medium"
-                                  ? "text-base"
-                                  : fontSize === "large"
-                                    ? "text-lg"
-                                    : "text-xl"
-                            }`}
-                          >
-                            {v.reference} ({v.version || "KJV"})
-                          </p>
+                        {isNote(v) ? (
+                          <>
+                            {v.reference && (
+                              <p
+                                className={`font-bold mb-4 ${
+                                  fontSize === "small"
+                                    ? "text-sm"
+                                    : fontSize === "medium"
+                                      ? "text-base"
+                                      : fontSize === "large"
+                                        ? "text-lg"
+                                        : "text-2xl"
+                                }`}
+                              >
+                                {v.reference}
+                              </p>
+                            )}
+                            <div
+                              className={`leading-relaxed font-serif whitespace-pre-wrap prose ${darkMode ? "prose-invert" : ""} max-w-none ${
+                                fontSize === "small"
+                                  ? "prose-sm"
+                                  : fontSize === "medium"
+                                    ? "prose-base"
+                                    : fontSize === "large"
+                                      ? "prose-lg"
+                                      : "prose-xl"
+                              }`}
+                            >
+                              <ReactMarkdown>{v.text}</ReactMarkdown>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p
+                              className={`leading-relaxed font-serif ${
+                                v.reference ? "text-balance" : "whitespace-pre-wrap"
+                              } ${
+                                fontSize === "small"
+                                  ? "text-sm"
+                                  : fontSize === "medium"
+                                    ? "text-base"
+                                    : fontSize === "large"
+                                      ? "text-lg"
+                                      : "text-2xl"
+                              }`}
+                              dangerouslySetInnerHTML={{ __html: v.text }}
+                            />
+                            {v.reference && (
+                              <p
+                                className={`mt-4 font-bold italic ${themeLoaded ? (darkMode ? "text-gray-400" : "text-gray-600") : "text-gray-400"} ${
+                                  fontSize === "small"
+                                    ? "text-sm"
+                                    : fontSize === "medium"
+                                      ? "text-base"
+                                      : fontSize === "large"
+                                        ? "text-lg"
+                                        : "text-xl"
+                                }`}
+                              >
+                                {v.reference} ({v.version || "KJV"})
+                              </p>
+                            )}
+                          </>
                         )}
                       </div>
                     ))}
@@ -746,34 +784,69 @@ export default function ControlPanel() {
                   <div className="space-y-4">
                     {liveVerses.map((v) => (
                       <div key={v.id}>
-                        <p
-                          className={`leading-relaxed font-serif ${
-                            v.reference ? "text-balance" : "whitespace-pre-wrap"
-                          } ${
-                            fontSize === "small"
-                              ? "text-sm"
-                              : fontSize === "medium"
-                                ? "text-base"
-                                : fontSize === "large"
-                                  ? "text-lg"
-                                  : "text-2xl"
-                          }`}
-                          dangerouslySetInnerHTML={{ __html: v.text }}
-                        />
-                        {v.reference && (
-                          <p
-                            className={`mt-4 font-bold italic ${themeLoaded ? (darkMode ? "text-gray-400" : "text-gray-600") : "text-gray-400"} ${
-                              fontSize === "small"
-                                ? "text-sm"
-                                : fontSize === "medium"
-                                  ? "text-base"
-                                  : fontSize === "large"
-                                    ? "text-lg"
-                                    : "text-xl"
-                            }`}
-                          >
-                            {v.reference} ({v.version || "KJV"})
-                          </p>
+                        {isNote(v) ? (
+                          <>
+                            {v.reference && (
+                              <p
+                                className={`font-bold mb-4 ${
+                                  fontSize === "small"
+                                    ? "text-sm"
+                                    : fontSize === "medium"
+                                      ? "text-base"
+                                      : fontSize === "large"
+                                        ? "text-lg"
+                                        : "text-2xl"
+                                }`}
+                              >
+                                {v.reference}
+                              </p>
+                            )}
+                            <div
+                              className={`leading-relaxed font-serif whitespace-pre-wrap prose ${darkMode ? "prose-invert" : ""} max-w-none ${
+                                fontSize === "small"
+                                  ? "prose-sm"
+                                  : fontSize === "medium"
+                                    ? "prose-base"
+                                    : fontSize === "large"
+                                      ? "prose-lg"
+                                      : "prose-xl"
+                              }`}
+                            >
+                              <ReactMarkdown>{v.text}</ReactMarkdown>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p
+                              className={`leading-relaxed font-serif ${
+                                v.reference ? "text-balance" : "whitespace-pre-wrap"
+                              } ${
+                                fontSize === "small"
+                                  ? "text-sm"
+                                  : fontSize === "medium"
+                                    ? "text-base"
+                                    : fontSize === "large"
+                                      ? "text-lg"
+                                      : "text-2xl"
+                              }`}
+                              dangerouslySetInnerHTML={{ __html: v.text }}
+                            />
+                            {v.reference && (
+                              <p
+                                className={`mt-4 font-bold italic ${themeLoaded ? (darkMode ? "text-gray-400" : "text-gray-600") : "text-gray-400"} ${
+                                  fontSize === "small"
+                                    ? "text-sm"
+                                    : fontSize === "medium"
+                                      ? "text-base"
+                                      : fontSize === "large"
+                                        ? "text-lg"
+                                        : "text-xl"
+                                }`}
+                              >
+                                {v.reference} ({v.version || "KJV"})
+                              </p>
+                            )}
+                          </>
                         )}
                       </div>
                     ))}
