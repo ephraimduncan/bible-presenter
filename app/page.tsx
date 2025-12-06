@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import ReactMarkdown from "react-markdown"
+import rehypeRaw from "rehype-raw"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -14,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ExternalLink, Moon, Sun, Book, BookOpen, Loader2, X, Plus, FileText, History } from "lucide-react"
+import { ExternalLink, Moon, Sun, Book, BookOpen, Loader2, X, Plus, FileText, History, Bold, Italic, Underline, List, ListOrdered } from "lucide-react"
 import {
   oldTestament,
   newTestament,
@@ -73,6 +75,30 @@ export default function ControlPanel() {
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [selectedVersion, setSelectedVersion] = useState("KJV")
   const [bookSearch, setBookSearch] = useState("")
+  const noteTextareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const insertFormatting = (prefix: string, suffix: string = prefix) => {
+    const textarea = noteTextareaRef.current
+    if (!textarea) return
+
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const text = customNoteText
+    const selectedText = text.substring(start, end)
+
+    const newText = text.substring(0, start) + prefix + selectedText + suffix + text.substring(end)
+    setCustomNoteText(newText)
+
+    // Restore focus and selection
+    setTimeout(() => {
+      textarea.focus()
+      if (selectedText) {
+        textarea.setSelectionRange(start + prefix.length, end + prefix.length)
+      } else {
+        textarea.setSelectionRange(start + prefix.length, start + prefix.length)
+      }
+    }, 0)
+  }
 
   useEffect(() => {
     const savedHistory = localStorage.getItem("biblePresenterHistory")
@@ -355,7 +381,7 @@ export default function ControlPanel() {
   }
 
   const projectCustomNote = () => {
-    if (!customNoteText.trim()) return
+    if (!customNoteText.trim() && !customNoteTitle.trim()) return
 
     const noteVerse: SelectedVerse = {
       id: `note-${Date.now()}`,
@@ -363,7 +389,7 @@ export default function ControlPanel() {
       chapter: 0,
       verse: 0,
       text: customNoteText.trim(),
-      reference: customNoteTitle.trim() || "",
+      reference: customNoteTitle.trim(),
     }
 
     const noteData: VerseData = {
@@ -377,11 +403,11 @@ export default function ControlPanel() {
 
     setLiveVerses([noteVerse])
 
-    addToHistory(customNoteText.trim(), customNoteTitle.trim() || "Note")
+    addToHistory(customNoteText.trim() || customNoteTitle.trim(), customNoteTitle.trim() || "Note")
   }
 
   const addCustomNoteToQueue = () => {
-    if (!customNoteText.trim()) return
+    if (!customNoteText.trim() && !customNoteTitle.trim()) return
 
     const newNote: SelectedVerse = {
       id: `note-${Date.now()}`,
@@ -397,10 +423,19 @@ export default function ControlPanel() {
   }
 
   const previewNote = () => {
-    if (!customNoteText.trim()) return
-    setCurrentVerseText(customNoteText.trim())
-    setCurrentReference(customNoteTitle.trim() || "")
+    if (!customNoteText.trim() && !customNoteTitle.trim()) return
+    const noteVerse: SelectedVerse = {
+      id: `note-${Date.now()}`,
+      book: "",
+      chapter: 0,
+      verse: 0,
+      text: customNoteText.trim(),
+      reference: customNoteTitle.trim(),
+    }
+    setPreviewVerses([noteVerse])
   }
+
+  const isNote = (verse: SelectedVerse) => verse.id.startsWith("note-") || verse.id.startsWith("history-")
 
   const fontSizeOptions: { value: FontSize; label: string }[] = [
     { value: "small", label: "S" },
@@ -655,34 +690,69 @@ export default function ControlPanel() {
                   <div className="space-y-4">
                     {previewVerses.map((v) => (
                       <div key={v.id}>
-                        <p
-                          className={`leading-relaxed font-serif ${
-                            v.reference ? "text-balance" : "whitespace-pre-wrap"
-                          } ${
-                            fontSize === "small"
-                              ? "text-sm"
-                              : fontSize === "medium"
-                                ? "text-base"
-                                : fontSize === "large"
-                                  ? "text-lg"
-                                  : "text-2xl"
-                          }`}
-                          dangerouslySetInnerHTML={{ __html: v.text }}
-                        />
-                        {v.reference && (
-                          <p
-                            className={`mt-4 font-bold italic ${themeLoaded ? (darkMode ? "text-gray-400" : "text-gray-600") : "text-gray-400"} ${
-                              fontSize === "small"
-                                ? "text-sm"
-                                : fontSize === "medium"
-                                  ? "text-base"
-                                  : fontSize === "large"
-                                    ? "text-lg"
-                                    : "text-xl"
-                            }`}
-                          >
-                            {v.reference} ({v.version || "KJV"})
-                          </p>
+                        {isNote(v) ? (
+                          <>
+                            {v.reference && (
+                              <p
+                                className={`font-bold mb-4 ${
+                                  fontSize === "small"
+                                    ? "text-sm"
+                                    : fontSize === "medium"
+                                      ? "text-base"
+                                      : fontSize === "large"
+                                        ? "text-lg"
+                                        : "text-2xl"
+                                }`}
+                              >
+                                {v.reference}
+                              </p>
+                            )}
+                            <div
+                              className={`leading-relaxed font-serif prose max-w-none prose-ol:list-inside prose-ul:list-inside prose-ol:pl-0 prose-ul:pl-0 ${darkMode ? "prose-invert" : ""} ${
+                                fontSize === "small"
+                                  ? "prose-sm"
+                                  : fontSize === "medium"
+                                    ? "prose-base"
+                                    : fontSize === "large"
+                                      ? "prose-lg"
+                                      : "prose-xl"
+                              }`}
+                            >
+                              <ReactMarkdown rehypePlugins={[rehypeRaw]}>{v.text}</ReactMarkdown>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p
+                              className={`leading-relaxed font-serif ${
+                                v.reference ? "text-balance" : "whitespace-pre-wrap"
+                              } ${
+                                fontSize === "small"
+                                  ? "text-sm"
+                                  : fontSize === "medium"
+                                    ? "text-base"
+                                    : fontSize === "large"
+                                      ? "text-lg"
+                                      : "text-2xl"
+                              }`}
+                              dangerouslySetInnerHTML={{ __html: v.text }}
+                            />
+                            {v.reference && (
+                              <p
+                                className={`mt-4 font-bold italic ${themeLoaded ? (darkMode ? "text-gray-400" : "text-gray-600") : "text-gray-400"} ${
+                                  fontSize === "small"
+                                    ? "text-sm"
+                                    : fontSize === "medium"
+                                      ? "text-base"
+                                      : fontSize === "large"
+                                        ? "text-lg"
+                                        : "text-xl"
+                                }`}
+                              >
+                                {v.reference} ({v.version || "KJV"})
+                              </p>
+                            )}
+                          </>
                         )}
                       </div>
                     ))}
@@ -746,34 +816,69 @@ export default function ControlPanel() {
                   <div className="space-y-4">
                     {liveVerses.map((v) => (
                       <div key={v.id}>
-                        <p
-                          className={`leading-relaxed font-serif ${
-                            v.reference ? "text-balance" : "whitespace-pre-wrap"
-                          } ${
-                            fontSize === "small"
-                              ? "text-sm"
-                              : fontSize === "medium"
-                                ? "text-base"
-                                : fontSize === "large"
-                                  ? "text-lg"
-                                  : "text-2xl"
-                          }`}
-                          dangerouslySetInnerHTML={{ __html: v.text }}
-                        />
-                        {v.reference && (
-                          <p
-                            className={`mt-4 font-bold italic ${themeLoaded ? (darkMode ? "text-gray-400" : "text-gray-600") : "text-gray-400"} ${
-                              fontSize === "small"
-                                ? "text-sm"
-                                : fontSize === "medium"
-                                  ? "text-base"
-                                  : fontSize === "large"
-                                    ? "text-lg"
-                                    : "text-xl"
-                            }`}
-                          >
-                            {v.reference} ({v.version || "KJV"})
-                          </p>
+                        {isNote(v) ? (
+                          <>
+                            {v.reference && (
+                              <p
+                                className={`font-bold mb-4 ${
+                                  fontSize === "small"
+                                    ? "text-sm"
+                                    : fontSize === "medium"
+                                      ? "text-base"
+                                      : fontSize === "large"
+                                        ? "text-lg"
+                                        : "text-2xl"
+                                }`}
+                              >
+                                {v.reference}
+                              </p>
+                            )}
+                            <div
+                              className={`leading-relaxed font-serif prose max-w-none prose-ol:list-inside prose-ul:list-inside prose-ol:pl-0 prose-ul:pl-0 ${darkMode ? "prose-invert" : ""} ${
+                                fontSize === "small"
+                                  ? "prose-sm"
+                                  : fontSize === "medium"
+                                    ? "prose-base"
+                                    : fontSize === "large"
+                                      ? "prose-lg"
+                                      : "prose-xl"
+                              }`}
+                            >
+                              <ReactMarkdown rehypePlugins={[rehypeRaw]}>{v.text}</ReactMarkdown>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p
+                              className={`leading-relaxed font-serif ${
+                                v.reference ? "text-balance" : "whitespace-pre-wrap"
+                              } ${
+                                fontSize === "small"
+                                  ? "text-sm"
+                                  : fontSize === "medium"
+                                    ? "text-base"
+                                    : fontSize === "large"
+                                      ? "text-lg"
+                                      : "text-2xl"
+                              }`}
+                              dangerouslySetInnerHTML={{ __html: v.text }}
+                            />
+                            {v.reference && (
+                              <p
+                                className={`mt-4 font-bold italic ${themeLoaded ? (darkMode ? "text-gray-400" : "text-gray-600") : "text-gray-400"} ${
+                                  fontSize === "small"
+                                    ? "text-sm"
+                                    : fontSize === "medium"
+                                      ? "text-base"
+                                      : fontSize === "large"
+                                        ? "text-lg"
+                                        : "text-xl"
+                                }`}
+                              >
+                                {v.reference} ({v.version || "KJV"})
+                              </p>
+                            )}
+                          </>
                         )}
                       </div>
                     ))}
@@ -892,7 +997,61 @@ export default function ControlPanel() {
                 </div>
                 <div className="flex-1 flex flex-col min-h-0">
                   <label className="text-sm font-medium mb-1.5 block">Note Text</label>
+                  <div className="flex gap-1 mb-1.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 w-7 p-0 bg-transparent"
+                      onClick={() => insertFormatting("**")}
+                      title="Bold"
+                    >
+                      <Bold className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 w-7 p-0 bg-transparent"
+                      onClick={() => insertFormatting("*")}
+                      title="Italic"
+                    >
+                      <Italic className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 w-7 p-0 bg-transparent"
+                      onClick={() => insertFormatting("<u>", "</u>")}
+                      title="Underline"
+                    >
+                      <Underline className="h-3.5 w-3.5" />
+                    </Button>
+                    <div className="w-px bg-border mx-1" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 w-7 p-0 bg-transparent"
+                      onClick={() => insertFormatting("1. ", "")}
+                      title="Numbered List"
+                    >
+                      <ListOrdered className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 w-7 p-0 bg-transparent"
+                      onClick={() => insertFormatting("- ", "")}
+                      title="Bullet List"
+                    >
+                      <List className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                   <Textarea
+                    ref={noteTextareaRef}
                     placeholder="Type your custom text here..."
                     value={customNoteText}
                     onChange={(e) => setCustomNoteText(e.target.value)}
@@ -904,12 +1063,12 @@ export default function ControlPanel() {
                     onClick={previewNote}
                     variant="outline"
                     className="w-full gap-2 bg-transparent"
-                    disabled={!customNoteText.trim()}
+                    disabled={!customNoteText.trim() && !customNoteTitle.trim()}
                   >
                     <BookOpen className="h-4 w-4" />
                     Preview Note
                   </Button>
-                  <Button onClick={projectCustomNote} className="w-full gap-2" disabled={!customNoteText.trim()}>
+                  <Button onClick={projectCustomNote} className="w-full gap-2" disabled={!customNoteText.trim() && !customNoteTitle.trim()}>
                     <ExternalLink className="h-4 w-4" />
                     Project Note
                   </Button>
@@ -917,7 +1076,7 @@ export default function ControlPanel() {
                     onClick={addCustomNoteToQueue}
                     variant="outline"
                     className="w-full gap-2 bg-transparent"
-                    disabled={!customNoteText.trim()}
+                    disabled={!customNoteText.trim() && !customNoteTitle.trim()}
                   >
                     <Plus className="h-4 w-4" />
                     Add to Queue

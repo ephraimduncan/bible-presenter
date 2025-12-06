@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import ReactMarkdown from "react-markdown"
+import rehypeRaw from "rehype-raw"
 
 type FontSize = "small" | "medium" | "large" | "extra-large"
 
@@ -153,6 +155,8 @@ export default function SlideshowPage() {
   const textColor = data.darkMode ? "text-white" : "text-gray-900"
   const referenceColor = data.darkMode ? "text-gray-400" : "text-gray-600"
 
+  const isNote = (verse: SelectedVerse) => verse.id.startsWith("note-") || verse.id.startsWith("history-")
+
   return (
     <div
       className={`min-h-screen ${bgColor} ${textColor} flex flex-col items-center justify-center p-8 md:p-12 lg:p-16`}
@@ -161,16 +165,38 @@ export default function SlideshowPage() {
         <div className="max-w-5xl w-full text-center space-y-12">
           {data.verses.map((verse) => (
             <div key={verse.id} className="space-y-4">
-              {/* Verse Text */}
-              <p
-                className={`${fontSizeClasses[data.fontSize]} leading-relaxed font-serif ${verse.reference ? "text-balance" : "whitespace-pre-wrap"}`}
-                dangerouslySetInnerHTML={{ __html: verse.text }}
-              />
+              {isNote(verse) ? (
+                <>
+                  {verse.reference && verse.reference.trim() !== "" && (
+                    <p className={`${fontSizeClasses[data.fontSize]} font-bold`}>
+                      {verse.reference}
+                    </p>
+                  )}
+                  <div
+                    className={`leading-relaxed font-serif prose max-w-none prose-ol:list-inside prose-ul:list-inside prose-ol:pl-0 prose-ul:pl-0 ${data.darkMode ? "prose-invert" : ""} ${
+                      data.fontSize === "small"
+                        ? "prose-lg"
+                        : data.fontSize === "medium"
+                          ? "prose-xl"
+                          : "prose-2xl"
+                    }`}
+                  >
+                    <ReactMarkdown rehypePlugins={[rehypeRaw]}>{verse.text}</ReactMarkdown>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p
+                    className={`${fontSizeClasses[data.fontSize]} leading-relaxed font-serif ${verse.reference ? "text-balance" : "whitespace-pre-wrap"}`}
+                    dangerouslySetInnerHTML={{ __html: verse.text }}
+                  />
 
-              {verse.reference && verse.reference.trim() !== "" && (
-                <p className={`mt-6 ${referenceSizeClasses[data.fontSize]} ${referenceColor} font-bold italic`}>
-                  {verse.reference} ({verse.version || data.version || "KJV"})
-                </p>
+                  {verse.reference && verse.reference.trim() !== "" && (
+                    <p className={`mt-6 ${referenceSizeClasses[data.fontSize]} ${referenceColor} font-bold italic`}>
+                      {verse.reference} ({verse.version || data.version || "KJV"})
+                    </p>
+                  )}
+                </>
               )}
             </div>
           ))}
