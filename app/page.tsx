@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ExternalLink, Moon, Sun, Book, BookOpen, Loader2, X, Plus, FileText, History, Bold, Italic, Underline, List, ListOrdered } from "lucide-react"
+import { ExternalLink, Moon, Sun, Book, BookOpen, Loader2, X, Plus, FileText, History, Bold, Italic, Underline, List, ListOrdered, XCircle } from "lucide-react"
 import {
   oldTestament,
   newTestament,
@@ -340,6 +340,18 @@ export default function ControlPanel() {
     setTimeout(() => {
       updateSlide()
     }, 500)
+  }
+
+  const clearDisplay = () => {
+    setLiveVerses([])
+    const data: VerseData = {
+      verses: [],
+      fontSize,
+      darkMode,
+      version: selectedVersion,
+    }
+    localStorage.setItem("bibleVerseData", JSON.stringify(data))
+    window.dispatchEvent(new Event("storage"))
   }
 
   const updateSlide = () => {
@@ -803,10 +815,23 @@ export default function ControlPanel() {
                 {liveVerses.length > 0 && <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
                 Live
               </span>
-              <Button size="sm" variant="outline" className="h-7 bg-transparent" onClick={openSlideshowWindow}>
-                <ExternalLink className="h-3 w-3 mr-1" />
-                Window
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 bg-transparent"
+                  onClick={clearDisplay}
+                  disabled={liveVerses.length === 0}
+                  title="Clear display"
+                >
+                  <XCircle className="h-3 w-3 mr-1" />
+                  Clear
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 bg-transparent" onClick={openSlideshowWindow}>
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  Window
+                </Button>
+              </div>
             </div>
             <Card
               className={`w-full flex-1 aspect-video border-2 border-red-500 overflow-hidden transition-colors ${themeLoaded ? (darkMode ? "bg-black text-white" : "bg-white text-black") : "bg-neutral-900 text-white"}`}
