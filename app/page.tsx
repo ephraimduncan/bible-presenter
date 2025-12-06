@@ -356,7 +356,7 @@ export default function ControlPanel() {
   }
 
   const projectCustomNote = () => {
-    if (!customNoteText.trim()) return
+    if (!customNoteText.trim() && !customNoteTitle.trim()) return
 
     const noteVerse: SelectedVerse = {
       id: `note-${Date.now()}`,
@@ -364,7 +364,7 @@ export default function ControlPanel() {
       chapter: 0,
       verse: 0,
       text: customNoteText.trim(),
-      reference: customNoteTitle.trim() || "",
+      reference: customNoteTitle.trim(),
     }
 
     const noteData: VerseData = {
@@ -378,11 +378,11 @@ export default function ControlPanel() {
 
     setLiveVerses([noteVerse])
 
-    addToHistory(customNoteText.trim(), customNoteTitle.trim() || "Note")
+    addToHistory(customNoteText.trim() || customNoteTitle.trim(), customNoteTitle.trim() || "Note")
   }
 
   const addCustomNoteToQueue = () => {
-    if (!customNoteText.trim()) return
+    if (!customNoteText.trim() && !customNoteTitle.trim()) return
 
     const newNote: SelectedVerse = {
       id: `note-${Date.now()}`,
@@ -398,9 +398,9 @@ export default function ControlPanel() {
   }
 
   const previewNote = () => {
-    if (!customNoteText.trim()) return
+    if (!customNoteText.trim() && !customNoteTitle.trim()) return
     setCurrentVerseText(customNoteText.trim())
-    setCurrentReference(customNoteTitle.trim() || "")
+    setCurrentReference(customNoteTitle.trim())
   }
 
   const isNote = (verse: SelectedVerse) => verse.id.startsWith("note-") || verse.id.startsWith("history-")
@@ -977,12 +977,12 @@ export default function ControlPanel() {
                     onClick={previewNote}
                     variant="outline"
                     className="w-full gap-2 bg-transparent"
-                    disabled={!customNoteText.trim()}
+                    disabled={!customNoteText.trim() && !customNoteTitle.trim()}
                   >
                     <BookOpen className="h-4 w-4" />
                     Preview Note
                   </Button>
-                  <Button onClick={projectCustomNote} className="w-full gap-2" disabled={!customNoteText.trim()}>
+                  <Button onClick={projectCustomNote} className="w-full gap-2" disabled={!customNoteText.trim() && !customNoteTitle.trim()}>
                     <ExternalLink className="h-4 w-4" />
                     Project Note
                   </Button>
@@ -990,7 +990,7 @@ export default function ControlPanel() {
                     onClick={addCustomNoteToQueue}
                     variant="outline"
                     className="w-full gap-2 bg-transparent"
-                    disabled={!customNoteText.trim()}
+                    disabled={!customNoteText.trim() && !customNoteTitle.trim()}
                   >
                     <Plus className="h-4 w-4" />
                     Add to Queue
