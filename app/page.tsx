@@ -399,8 +399,15 @@ export default function ControlPanel() {
 
   const previewNote = () => {
     if (!customNoteText.trim() && !customNoteTitle.trim()) return
-    setCurrentVerseText(customNoteText.trim())
-    setCurrentReference(customNoteTitle.trim())
+    const noteVerse: SelectedVerse = {
+      id: `note-${Date.now()}`,
+      book: "",
+      chapter: 0,
+      verse: 0,
+      text: customNoteText.trim(),
+      reference: customNoteTitle.trim(),
+    }
+    setPreviewVerses([noteVerse])
   }
 
   const isNote = (verse: SelectedVerse) => verse.id.startsWith("note-") || verse.id.startsWith("history-")
