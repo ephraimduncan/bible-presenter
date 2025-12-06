@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import ReactMarkdown from "react-markdown"
+import rehypeRaw from "rehype-raw"
 
 type FontSize = "small" | "medium" | "large" | "extra-large"
 
@@ -172,17 +173,15 @@ export default function SlideshowPage() {
                     </p>
                   )}
                   <div
-                    className={`leading-relaxed font-serif whitespace-pre-wrap prose ${data.darkMode ? "prose-invert" : ""} max-w-none ${
+                    className={`leading-relaxed font-serif prose max-w-none prose-ol:list-inside prose-ul:list-inside prose-ol:pl-0 prose-ul:pl-0 ${data.darkMode ? "prose-invert" : ""} ${
                       data.fontSize === "small"
                         ? "prose-lg"
                         : data.fontSize === "medium"
                           ? "prose-xl"
-                          : data.fontSize === "large"
-                            ? "prose-2xl"
-                            : "prose-2xl"
+                          : "prose-2xl"
                     }`}
                   >
-                    <ReactMarkdown>{verse.text}</ReactMarkdown>
+                    <ReactMarkdown rehypePlugins={[rehypeRaw]}>{verse.text}</ReactMarkdown>
                   </div>
                 </>
               ) : (
