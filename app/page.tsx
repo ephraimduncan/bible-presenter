@@ -61,6 +61,7 @@ export default function ControlPanel() {
   const [selectedVerses, setSelectedVerses] = useState<SelectedVerse[]>([])
   const [fontSize, setFontSize] = useState<FontSize>("extra-large") // default to extra-large
   const [darkMode, setDarkMode] = useState(true)
+  const [themeLoaded, setThemeLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [slideshowWindow, setSlideshowWindow] = useState<Window | null>(null)
   const [liveVerses, setLiveVerses] = useState<SelectedVerse[]>([])
@@ -82,11 +83,20 @@ export default function ControlPanel() {
     if (savedVersion) {
       setSelectedVersion(savedVersion)
     }
+    const savedDarkMode = localStorage.getItem("biblePresenterDarkMode")
+    if (savedDarkMode !== null) {
+      setDarkMode(JSON.parse(savedDarkMode))
+    }
+    setThemeLoaded(true)
   }, [])
 
   useEffect(() => {
     localStorage.setItem("bibleVersion", selectedVersion)
   }, [selectedVersion])
+
+  useEffect(() => {
+    localStorage.setItem("biblePresenterDarkMode", JSON.stringify(darkMode))
+  }, [darkMode])
 
   const addToHistory = (text: string, reference: string) => {
     const newItem: HistoryItem = {
@@ -636,7 +646,7 @@ export default function ControlPanel() {
               </Button>
             </div>
             <Card
-              className={`w-full flex-1 aspect-video ${darkMode ? "bg-black text-white" : "bg-white text-black"} overflow-hidden`}
+              className={`w-full flex-1 aspect-video overflow-hidden transition-colors ${themeLoaded ? (darkMode ? "bg-black text-white" : "bg-white text-black") : "bg-neutral-900 text-white"}`}
             >
               <CardContent className="h-full flex flex-col justify-center items-center text-center p-4 xl:p-6 max-w-full overflow-auto">
                 {loading ? (
@@ -661,7 +671,7 @@ export default function ControlPanel() {
                         />
                         {v.reference && (
                           <p
-                            className={`mt-4 font-bold italic ${darkMode ? "text-gray-400" : "text-gray-600"} ${
+                            className={`mt-4 font-bold italic ${themeLoaded ? (darkMode ? "text-gray-400" : "text-gray-600") : "text-gray-400"} ${
                               fontSize === "small"
                                 ? "text-sm"
                                 : fontSize === "medium"
@@ -695,7 +705,7 @@ export default function ControlPanel() {
                     />
                     {currentReference && (
                       <p
-                        className={`mt-4 font-bold italic ${darkMode ? "text-gray-400" : "text-gray-600"} ${
+                        className={`mt-4 font-bold italic ${themeLoaded ? (darkMode ? "text-gray-400" : "text-gray-600") : "text-gray-400"} ${
                           fontSize === "small"
                             ? "text-sm"
                             : fontSize === "medium"
@@ -729,7 +739,7 @@ export default function ControlPanel() {
               </Button>
             </div>
             <Card
-              className={`w-full flex-1 aspect-video border-2 border-red-500 ${darkMode ? "bg-black text-white" : "bg-white text-black"} overflow-hidden`}
+              className={`w-full flex-1 aspect-video border-2 border-red-500 overflow-hidden transition-colors ${themeLoaded ? (darkMode ? "bg-black text-white" : "bg-white text-black") : "bg-neutral-900 text-white"}`}
             >
               <CardContent className="h-full flex flex-col justify-center items-center text-center p-4 xl:p-6 max-w-full overflow-auto">
                 {liveVerses.length > 0 ? (
@@ -752,7 +762,7 @@ export default function ControlPanel() {
                         />
                         {v.reference && (
                           <p
-                            className={`mt-4 font-bold italic ${darkMode ? "text-gray-400" : "text-gray-600"} ${
+                            className={`mt-4 font-bold italic ${themeLoaded ? (darkMode ? "text-gray-400" : "text-gray-600") : "text-gray-400"} ${
                               fontSize === "small"
                                 ? "text-sm"
                                 : fontSize === "medium"
